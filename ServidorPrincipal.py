@@ -10,7 +10,7 @@ def main():
     s.bind((host, port))
 
     s.listen(1)
-    while True:  # Añade este bucle para aceptar múltiples conexiones
+    while True:
         c, addr = s.accept()
         print("Connection from: " + str(addr))
         while True:

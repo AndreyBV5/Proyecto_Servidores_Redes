@@ -2,7 +2,7 @@
 import os
 import socket
 import json
-import time  # Importa el módulo time para usar la función sleep
+import time
 
 def get_video_list(video_dir):
     videos = os.listdir(video_dir)
@@ -10,8 +10,8 @@ def get_video_list(video_dir):
 
 def main():
     host = 'localhost'
-    port = 5001  # Configura el puerto directamente en el código
-    video_dir = r'C:\Users\andre\Videos\ingenieria'  # Configura la ruta de la carpeta de videos directamente en el código
+    port = 5001  # Configurar el puerto directamente en el código
+    video_dir = r'C:\Users\andre\Videos\ingenieria'  # Configurar la ruta de la carpeta de videos directamente en el código
 
     print(f"Servidor de videos iniciado en {host}:{port}")
     print(f"Almacenando videos desde {video_dir}")
@@ -19,11 +19,11 @@ def main():
     s = socket.socket()
     s.bind((host, port))
 
-    # Conéctate al servidor principal y envía la lista de videos
+    # Conectar al servidor principal y envíar la lista de videos
     main_server_host = 'localhost'
     main_server_port = 5000
     main_server_socket = socket.socket()
-    while True:  # Añade este bucle para intentar conectarse al servidor principal hasta que tenga éxito
+    while True:
         try:
             main_server_socket.connect((main_server_host, main_server_port))
             break
