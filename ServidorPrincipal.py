@@ -1,8 +1,8 @@
-# Servidor Principal
 import socket
 import json
+import argparse
 
-def main():
+def main(video_server_port):
     host = 'localhost'
     port = 5000
 
@@ -12,15 +12,14 @@ def main():
     s.listen(1)
     while True:
         c, addr = s.accept()
-        print("Connection from: " + str(addr))
+        print("Conexión desde: " + str(addr))
         while True:
             data = c.recv(1024).decode('utf-8')
             if not data:
                 break
-            print("from connected user: " + data)
+            print("Desde el usuario conectado: " + data)
             if data == 'get_video_list':
                 video_server_host = 'localhost'
-                video_server_port = 5001
                 video_server_socket = socket.socket()
                 video_server_socket.connect((video_server_host, video_server_port))
                 video_server_socket.send('get_video_list'.encode('utf-8'))
@@ -30,4 +29,7 @@ def main():
         c.close()
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description="Por favor, proporciona el puerto del servidor de videos como argumento al iniciar el servidor.")
+    parser.add_argument('video_server_port', type=int, help='Puerto del servidor de videos')
+    args = parser.parse_args()
+    main(args.video_server_port)
