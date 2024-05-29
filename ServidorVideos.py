@@ -1,17 +1,26 @@
-# Servidor de Videos
+# ServidorVideos.py
 import os
 import socket
 import json
 import time
+import argparse
 
 def get_video_list(video_dir):
     videos = os.listdir(video_dir)
     return videos
 
 def main():
+    # Configurar el parser de argumentos
+    parser = argparse.ArgumentParser(description='Servidor de Videos')
+    parser.add_argument('port', type=int, help='Puerto en que escucha el servidor')
+    parser.add_argument('video_dir', type=str, help='Ruta de la carpeta en que se almacenan los vídeos')
+
+    # Parsear los argumentos
+    args = parser.parse_args()
+    port = args.port
+    video_dir = args.video_dir
+
     host = 'localhost'
-    port = 5001  # Configurar el puerto directamente en el código
-    video_dir = r'C:\Users\andre\Videos\ingenieria'  # Configurar la ruta de la carpeta de videos directamente en el código
 
     print(f"Servidor de videos iniciado en {host}:{port}")
     print(f"Almacenando videos desde {video_dir}")
