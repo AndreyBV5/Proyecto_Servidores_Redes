@@ -19,7 +19,7 @@ def main():
     port = args.port
     video_dir = args.video_dir
 
-    host = 'localhost'
+    host = '192.168.0.7' #Mi direccion IP de PC como servidor de video
 
     print(f"Servidor de videos iniciado en {host}:{port}")
     print(f"Almacenando videos desde {video_dir}")
@@ -28,7 +28,7 @@ def main():
     s.bind((host, port))
 
     # Conectar al servidor principal y enviar la lista de videos
-    main_server_host = 'localhost'
+    main_server_host = '192.168.0.8'
     main_server_port = 5000
     main_server_socket = socket.socket()
     while True:
