@@ -2,9 +2,19 @@ import socket
 import json
 import argparse
 
-def main(video_server_port):
+def main():
+
+    # Configurar el parser de argumentos
+    parser = argparse.ArgumentParser(description="Por favor, proporciona el puerto del servidor principal como argumento al iniciar el servidor.")
+    parser.add_argument('port', type=int, help='Puerto del servidor principal')
+    args = parser.parse_args()
+
+    # Parsear los argumentos
+    args = parser.parse_args()
+    port = args.port
+
     host = '192.168.0.8'
-    port = 5000  # Este es el puerto en el que el servidor principal escucha
+    #port = 5000  # Este es el puerto en el que el servidor principal escucha
 
     s = socket.socket()
     s.bind((host, port))
@@ -21,7 +31,8 @@ def main(video_server_port):
                 break
             print("Desde el usuario conectado: " + data)
             if data == 'get_video_list':
-                video_server_host = 'localhost'
+                video_server_host = '192.168.0.7'
+                video_server_port = 5001
                 video_server_socket = socket.socket()
                 video_server_socket.connect((video_server_host, video_server_port))
                 video_server_socket.send('get_video_list'.encode('utf-8'))
@@ -31,7 +42,4 @@ def main(video_server_port):
         c.close()
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Por favor, proporciona el puerto del servidor de videos como argumento al iniciar el servidor.")
-    parser.add_argument('video_server_port', type=int, help='Puerto del servidor de videos')
-    args = parser.parse_args()
-    main(args.video_server_port)
+    main()

@@ -2,8 +2,8 @@
 import socket
 
 def main():
-    host = 'localhost'
-    port = 5000
+    host = '192.168.0.8'
+    port = 5001
 
     s = socket.socket()
     s.connect((host, port))
