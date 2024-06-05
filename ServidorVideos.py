@@ -1,4 +1,3 @@
-# ServidorVideos.py
 import os
 import socket
 import json
@@ -57,5 +56,5 @@ def main():
                 c.send(json.dumps(videos).encode('utf-8'))
         c.close()
 
-if _name_ == '_main_':
+if __name__ == '__main__':
     main()
