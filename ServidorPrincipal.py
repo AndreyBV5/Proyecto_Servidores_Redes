@@ -3,13 +3,15 @@ import json
 import argparse
 
 def main(video_server_port):
-    host = 'localhost'
-    port = 5000
+    host = '192.168.0.8'
+    port = 5000  # Este es el puerto en el que el servidor principal escucha
 
     s = socket.socket()
     s.bind((host, port))
-
     s.listen(1)
+
+    print(f"Servidor principal escuchando en {host}:{port}")
+
     while True:
         c, addr = s.accept()
         print("Conexión desde: " + str(addr))

@@ -27,7 +27,7 @@ def main():
     s = socket.socket()
     s.bind((host, port))
 
-    # Conectar al servidor principal y envíar la lista de videos
+    # Conectar al servidor principal y enviar la lista de videos
     main_server_host = 'localhost'
     main_server_port = 5000
     main_server_socket = socket.socket()
@@ -45,12 +45,12 @@ def main():
     s.listen(1)
     while True:
         c, addr = s.accept()
-        print("Connection from: " + str(addr))
+        print("Conexión desde: " + str(addr))
         while True:
             data = c.recv(1024).decode('utf-8')
             if not data:
                 break
-            print("from connected user: " + data)
+            print("Desde el usuario conectado: " + data)
             if data == 'get_video_list':
                 videos = get_video_list(video_dir)
                 c.send(json.dumps(videos).encode('utf-8'))
