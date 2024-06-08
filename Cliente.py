@@ -1,7 +1,7 @@
+# Cliente
 import socket
 import json
 import argparse
-import os
 
 def main():
     parser = argparse.ArgumentParser(description="Cliente para acceder al servidor principal.")

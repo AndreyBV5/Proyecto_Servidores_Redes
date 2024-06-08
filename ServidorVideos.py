@@ -1,3 +1,4 @@
+# Servidor de Videos
 import os
 import socket
 import json
@@ -70,5 +71,6 @@ def main():
 
         c.close()
 
-if __name__ == '__main__':
+if __name__:
     main()
+

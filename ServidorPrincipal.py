@@ -1,8 +1,9 @@
+# Servidor Principal
 import socket
 import json
+import argparse
 
-def main():
-    port = 5000
+def main(port):
     host = '192.168.0.9'  # Cambia esta IP según sea necesario
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -11,7 +12,7 @@ def main():
 
     print(f"Servidor principal escuchando en {host}:{port}")
 
-    video_server_info = None
+    video_servers = {}
 
     while True:
         c, addr = s.accept()
@@ -24,16 +25,19 @@ def main():
         print("Desde el usuario conectado: " + data)
 
         if data == 'get_video_list':
-            if video_server_info:
-                c.send(json.dumps(video_server_info['videos']).encode('utf-8'))
-            else:
-                c.send(json.dumps({"error": "No hay servidores de video disponibles"}).encode('utf-8'))
+            all_videos = []
+            for server, info in video_servers.items():
+                all_videos.extend(info['videos'])
+            c.send(json.dumps(all_videos).encode('utf-8'))
         elif data.startswith('download_video'):
             video_number = int(data.split()[1])
-            if video_server_info and 0 < video_number <= len(video_server_info['videos']):
-                video_name = video_server_info['videos'][video_number - 1]
-                video_host = video_server_info['host']
-                video_port = video_server_info['port']
+            all_videos = []
+            for server, info in video_servers.items():
+                all_videos.extend([(video, server) for video in info['videos']])
+            
+            if 0 < video_number <= len(all_videos):
+                video_name, server = all_videos[video_number - 1]
+                video_host, video_port = video_servers[server]['host'], video_servers[server]['port']
                 
                 # Conectar al Servidor de Videos
                 vs_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -57,6 +61,7 @@ def main():
             # Manejo de conexión desde el Servidor de Videos
             try:
                 video_server_info = json.loads(data)
+                video_servers[addr] = video_server_info
                 print(f"Servidor de videos conectado: {video_server_info}")
                 c.send(json.dumps({"status": "Servidor de videos registrado con éxito"}).encode('utf-8'))
             except json.JSONDecodeError as e:
@@ -65,4 +70,9 @@ def main():
         c.close()
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description="Servidor Principal")
+    parser.add_argument("port", type=int, help="Puerto en el que escucha el servidor")
+    args = parser.parse_args()
+    main(args.port)
+
+
