@@ -1,47 +1,66 @@
 import socket
 import json
-import argparse
 
 def main():
-    parser = argparse.ArgumentParser(description="Por favor, proporciona el puerto del servidor principal como argumento al iniciar el servidor.")
-    parser.add_argument('port', type=int, help='Puerto del servidor principal')
-    args = parser.parse_args()
-
-    port = args.port
-    host = '192.168.0.9'  # IP del Servidor Principal
+    port = 5000
+    host = '192.168.0.9'  # Cambia esta IP según sea necesario
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind((host, port))
-    s.listen(5)  # Permitir múltiples conexiones
+    s.listen(5)
 
     print(f"Servidor principal escuchando en {host}:{port}")
+
+    video_server_info = None
 
     while True:
         c, addr = s.accept()
         print("Conexión desde: " + str(addr))
         data = c.recv(1024).decode('utf-8')
-        if not data.strip():
+        if not data:
             c.close()
             continue
 
         print("Desde el usuario conectado: " + data)
 
-        if data.startswith('get_video_list'):
-            video_server_host = 'localhost'  # IP del servidor de videos
-            video_server_port = 5001  # Puerto del servidor de videos
-            video_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            try:
-                video_server_socket.connect((video_server_host, video_server_port))
-                video_server_socket.send('get_video_list'.encode('utf-8'))
-                videos = video_server_socket.recv(1024).decode('utf-8')
-                video_server_socket.close()
-                print("Videos recibidos del servidor de videos: " + videos)
-                c.send(videos.encode('utf-8'))  # Envía la lista de videos al cliente
-            except Exception as e:
-                print(f"Error al conectar con el servidor de videos: {e}")
-                c.send(json.dumps({"error": "No se pudo conectar al servidor de videos"}).encode('utf-8'))
+        if data == 'get_video_list':
+            if video_server_info:
+                c.send(json.dumps(video_server_info['videos']).encode('utf-8'))
+            else:
+                c.send(json.dumps({"error": "No hay servidores de video disponibles"}).encode('utf-8'))
+        elif data.startswith('download_video'):
+            video_number = int(data.split()[1])
+            if video_server_info and 0 < video_number <= len(video_server_info['videos']):
+                video_name = video_server_info['videos'][video_number - 1]
+                video_host = video_server_info['host']
+                video_port = video_server_info['port']
+                
+                # Conectar al Servidor de Videos
+                vs_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                vs_socket.connect((video_host, video_port))
+                vs_socket.send(video_name.encode('utf-8'))
+
+                # Confirmar el nombre del video al cliente
+                c.send(json.dumps({"video_name": video_name}).encode('utf-8'))
+
+                # Recibir el video en partes y reenviar al cliente
+                while True:
+                    chunk = vs_socket.recv(1024)
+                    if not chunk:
+                        break
+                    c.send(chunk)
+                
+                vs_socket.close()
+            else:
+                c.send(json.dumps({"error": "Número de video inválido"}).encode('utf-8'))
         else:
-            c.send(json.dumps({"error": "Solicitud no válida"}).encode('utf-8'))
+            # Manejo de conexión desde el Servidor de Videos
+            try:
+                video_server_info = json.loads(data)
+                print(f"Servidor de videos conectado: {video_server_info}")
+                c.send(json.dumps({"status": "Servidor de videos registrado con éxito"}).encode('utf-8'))
+            except json.JSONDecodeError as e:
+                print(f"Error al decodificar JSON: {e}")
 
         c.close()
 
