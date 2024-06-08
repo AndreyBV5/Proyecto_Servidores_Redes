@@ -27,16 +27,19 @@ def main(port):
         if data == 'get_video_list':
             all_videos = []
             for server, info in video_servers.items():
-                all_videos.extend(info['videos'])
+                for video in info['videos']:
+                    all_videos.append({'name': video['name'], 'size': video['size'], 'server': server})
             c.send(json.dumps(all_videos).encode('utf-8'))
         elif data.startswith('download_video'):
             video_number = int(data.split()[1])
             all_videos = []
             for server, info in video_servers.items():
-                all_videos.extend([(video, server) for video in info['videos']])
+                for video in info['videos']:
+                    all_videos.append({'name': video['name'], 'size': video['size'], 'server': server})
             
             if 0 < video_number <= len(all_videos):
-                video_name, server = all_videos[video_number - 1]
+                video_info = all_videos[video_number - 1]
+                video_name, video_size, server = video_info['name'], video_info['size'], video_info['server']
                 video_host, video_port = video_servers[server]['host'], video_servers[server]['port']
                 
                 # Conectar al Servidor de Videos
@@ -45,7 +48,7 @@ def main(port):
                 vs_socket.send(video_name.encode('utf-8'))
 
                 # Confirmar el nombre del video al cliente
-                c.send(json.dumps({"video_name": video_name}).encode('utf-8'))
+                c.send(json.dumps({"video_name": video_name, "video_size": video_size}).encode('utf-8'))
 
                 # Recibir el video en partes y reenviar al cliente
                 while True:
@@ -74,5 +77,3 @@ if __name__ == '__main__':
     parser.add_argument("port", type=int, help="Puerto en el que escucha el servidor")
     args = parser.parse_args()
     main(args.port)
-
-
