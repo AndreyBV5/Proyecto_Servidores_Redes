@@ -4,7 +4,7 @@ import json
 import argparse
 
 def main(port):
-    host = '192.168.0.9'  # Cambia esta IP según sea necesario
+    host = '192.168.0.9'  
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind((host, port))
@@ -25,22 +25,25 @@ def main(port):
         print("Desde el usuario conectado: " + data)
 
         if data == 'get_video_list':
-            all_videos = []
+            all_videos = {}
             for server, info in video_servers.items():
                 for video in info['videos']:
-                    if video not in all_videos:  # Evita duplicados
-                        all_videos.append({'name': video['name'], 'size': video['size'], 'server': server})
-            c.send(json.dumps(all_videos).encode('utf-8'))
+                    video_key = (video['name'], video['size'])
+                    if video_key not in all_videos:  # Evita duplicados
+                        all_videos[video_key] = {'name': video['name'], 'size': video['size'], 'server': server}
+            c.send(json.dumps(list(all_videos.values())).encode('utf-8'))
         elif data.startswith('download_video'):
             video_number = int(data.split()[1])
-            all_videos = []
+            all_videos = {}
             for server, info in video_servers.items():
                 for video in info['videos']:
-                    if video not in all_videos:  # Evita duplicados
-                        all_videos.append({'name': video['name'], 'size': video['size'], 'server': server})
+                    video_key = (video['name'], video['size'])
+                    if video_key not in all_videos:  # Evita duplicados
+                        all_videos[video_key] = {'name': video['name'], 'size': video['size'], 'server': server}
             
-            if 0 < video_number <= len(all_videos):
-                video_info = all_videos[video_number - 1]
+            all_videos_list = list(all_videos.values())
+            if 0 < video_number <= len(all_videos_list):
+                video_info = all_videos_list[video_number - 1]
                 video_name, video_size, server = video_info['name'], video_info['size'], video_info['server']
 
                 # Obtener los servidores que tienen este video
