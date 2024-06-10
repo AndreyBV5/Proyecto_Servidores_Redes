@@ -25,18 +25,24 @@ def main(port):
         print("Desde el usuario conectado: " + data)
 
         if data == 'get_video_list':
-            all_videos = []
+            unique_videos = {}
             for server, info in video_servers.items():
                 for video in info['videos']:
-                    all_videos.append({'name': video['name'], 'size': video['size'], 'server': server})
+                    if video['name'] not in unique_videos:
+                        unique_videos[video['name']] = {'name': video['name'], 'size': video['size'], 'server': server}
+
+            all_videos = list(unique_videos.values())
             c.send(json.dumps(all_videos).encode('utf-8'))
         elif data.startswith('download_video'):
             video_number = int(data.split()[1])
-            all_videos = []
+            unique_videos = {}
             for server, info in video_servers.items():
                 for video in info['videos']:
-                    all_videos.append({'name': video['name'], 'size': video['size'], 'server': server})
-            
+                    if video['name'] not in unique_videos:
+                        unique_videos[video['name']] = {'name': video['name'], 'size': video['size'], 'server': server}
+
+            all_videos = list(unique_videos.values())
+
             if 0 < video_number <= len(all_videos):
                 video_info = all_videos[video_number - 1]
                 video_name, video_size, server = video_info['name'], video_info['size'], video_info['server']
@@ -83,4 +89,3 @@ if __name__ == '__main__':
     parser.add_argument("port", type=int, help="Puerto en el que escucha el servidor")
     args = parser.parse_args()
     main(args.port)
-

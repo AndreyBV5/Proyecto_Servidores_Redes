@@ -20,7 +20,7 @@ def main():
     main_server_host = args.host
     video_dir = args.video_dir
 
-    video_server_host = 'localhost'  # IP del Servidor de Videos
+    video_server_host = '192.168.0.8'  # IP del Servidor de Videos
 
     print(f"Servidor de videos iniciado en {video_server_host}:{port}")
     print(f"Almacenando videos desde {video_dir}")
@@ -54,17 +54,18 @@ def main():
 
         data = c.recv(1024).decode('utf-8')
         print(f"Desde el usuario conectado: {data}")
-        
+
         if data == 'get_video_list':
             videos = get_video_list(video_dir)
             c.send(json.dumps(videos).encode('utf-8'))
         else:
-            video_name, part_number, part_size = data.split('|')
-            part_number = int(part_number)
-            part_size = int(part_size)
-            video_path = os.path.join(video_dir, video_name)
-            
             try:
+                video_name, part_number, part_size, video_size = data.split('|')
+                part_number = int(part_number)
+                part_size = int(part_size)
+                video_size = int(video_size)
+                video_path = os.path.join(video_dir, video_name)
+
                 start_time = time.time()
                 with open(video_path, 'rb') as video_file:
                     video_file.seek(part_number * part_size)
@@ -78,19 +79,14 @@ def main():
                         bytes_remaining -= len(chunk)
                 end_time = time.time()
                 duration = end_time - start_time
-                c.send(json.dumps({"part": part_number, "duration": duration}).encode('utf-8'))
+                print(f"Parte {part_number} descargada en {duration:.2f} segundos")
             except FileNotFoundError:
                 c.send(json.dumps({"error": f"No se encontró el video '{video_name}'"}).encode('utf-8'))
+            except Exception as e:
+                print(f"Error al procesar la solicitud: {e}")
+                c.send(json.dumps({"error": "Error al procesar la solicitud"}).encode('utf-8'))
 
         c.close()
 
 if __name__ == '__main__':
     main()
-
-
-
-
-
-
-
-

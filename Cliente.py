@@ -22,7 +22,7 @@ def download_video(s, video_name, video_size, num_parts):
         with tqdm(total=video_size, unit='B', unit_scale=True, desc=video_name, ascii=True) as pbar:
             for part in range(num_parts):
                 part_start_time = time.time()
-                while True:
+                while downloaded < (part + 1) * (video_size // num_parts):
                     chunk = s.recv(1024)
                     if not chunk:
                         break
@@ -94,10 +94,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-
-
-
-
-
