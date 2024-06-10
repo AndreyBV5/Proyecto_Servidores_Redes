@@ -25,24 +25,20 @@ def main(port):
         print("Desde el usuario conectado: " + data)
 
         if data == 'get_video_list':
-            unique_videos = {}
+            all_videos = []
             for server, info in video_servers.items():
                 for video in info['videos']:
-                    if video['name'] not in unique_videos:
-                        unique_videos[video['name']] = {'name': video['name'], 'size': video['size'], 'server': server}
-
-            all_videos = list(unique_videos.values())
+                    if video not in all_videos:  # Evita duplicados
+                        all_videos.append({'name': video['name'], 'size': video['size'], 'server': server})
             c.send(json.dumps(all_videos).encode('utf-8'))
         elif data.startswith('download_video'):
             video_number = int(data.split()[1])
-            unique_videos = {}
+            all_videos = []
             for server, info in video_servers.items():
                 for video in info['videos']:
-                    if video['name'] not in unique_videos:
-                        unique_videos[video['name']] = {'name': video['name'], 'size': video['size'], 'server': server}
-
-            all_videos = list(unique_videos.values())
-
+                    if video not in all_videos:  # Evita duplicados
+                        all_videos.append({'name': video['name'], 'size': video['size'], 'server': server})
+            
             if 0 < video_number <= len(all_videos):
                 video_info = all_videos[video_number - 1]
                 video_name, video_size, server = video_info['name'], video_info['size'], video_info['server']
@@ -60,7 +56,7 @@ def main(port):
                     # Conectar al Servidor de Videos
                     vs_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     vs_socket.connect((video_host, video_port))
-                    vs_socket.send(f"{video_name}|{i}|{part_size}".encode('utf-8'))
+                    vs_socket.send(f"{video_name}|{i}|{part_size}|{video_size}".encode('utf-8'))
 
                     # Recibir la parte del video y reenviar al cliente
                     while True:

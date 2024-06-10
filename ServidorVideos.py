@@ -20,7 +20,7 @@ def main():
     main_server_host = args.host
     video_dir = args.video_dir
 
-    video_server_host = '192.168.0.8'  # IP del Servidor de Videos
+    video_server_host = '192.168.0.9'  # IP del Servidor de Videos
 
     print(f"Servidor de videos iniciado en {video_server_host}:{port}")
     print(f"Almacenando videos desde {video_dir}")
