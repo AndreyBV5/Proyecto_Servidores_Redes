@@ -40,24 +40,30 @@ def main(port):
             if 0 < video_number <= len(all_videos):
                 video_info = all_videos[video_number - 1]
                 video_name, video_size, server = video_info['name'], video_info['size'], video_info['server']
-                video_host, video_port = video_servers[server]['host'], video_servers[server]['port']
-                
-                # Conectar al Servidor de Videos
-                vs_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                vs_socket.connect((video_host, video_port))
-                vs_socket.send(video_name.encode('utf-8'))
 
-                # Confirmar el nombre del video al cliente
-                c.send(json.dumps({"video_name": video_name, "video_size": video_size}).encode('utf-8'))
+                # Obtener los servidores que tienen este video
+                servers_with_video = [s for s in video_servers if any(v['name'] == video_name for v in video_servers[s]['videos'])]
+                num_servers = len(servers_with_video)
+                part_size = video_size // num_servers
 
-                # Recibir el video en partes y reenviar al cliente
-                while True:
-                    chunk = vs_socket.recv(1024)
-                    if not chunk:
-                        break
-                    c.send(chunk)
-                
-                vs_socket.close()
+                c.send(json.dumps({"video_name": video_name, "video_size": video_size, "parts": num_servers}).encode('utf-8'))
+
+                for i, server in enumerate(servers_with_video):
+                    video_host, video_port = video_servers[server]['host'], video_servers[server]['port']
+                    
+                    # Conectar al Servidor de Videos
+                    vs_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    vs_socket.connect((video_host, video_port))
+                    vs_socket.send(f"{video_name}|{i}|{part_size}".encode('utf-8'))
+
+                    # Recibir la parte del video y reenviar al cliente
+                    while True:
+                        chunk = vs_socket.recv(1024)
+                        if not chunk:
+                            break
+                        c.send(chunk)
+                    
+                    vs_socket.close()
             else:
                 c.send(json.dumps({"error": "Número de video inválido"}).encode('utf-8'))
         else:
@@ -77,3 +83,4 @@ if __name__ == '__main__':
     parser.add_argument("port", type=int, help="Puerto en el que escucha el servidor")
     args = parser.parse_args()
     main(args.port)
+

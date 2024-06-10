@@ -59,18 +59,38 @@ def main():
             videos = get_video_list(video_dir)
             c.send(json.dumps(videos).encode('utf-8'))
         else:
-            video_path = os.path.join(video_dir, data)
+            video_name, part_number, part_size = data.split('|')
+            part_number = int(part_number)
+            part_size = int(part_size)
+            video_path = os.path.join(video_dir, video_name)
+            
             try:
+                start_time = time.time()
                 with open(video_path, 'rb') as video_file:
-                    while True:
-                        chunk = video_file.read(1024)
+                    video_file.seek(part_number * part_size)
+                    bytes_remaining = part_size
+                    while bytes_remaining > 0:
+                        chunk_size = min(1024, bytes_remaining)
+                        chunk = video_file.read(chunk_size)
                         if not chunk:
                             break
                         c.send(chunk)
+                        bytes_remaining -= len(chunk)
+                end_time = time.time()
+                duration = end_time - start_time
+                c.send(json.dumps({"part": part_number, "duration": duration}).encode('utf-8'))
             except FileNotFoundError:
-                c.send(json.dumps({"error": f"No se encontró el video '{data}'"}).encode('utf-8'))
+                c.send(json.dumps({"error": f"No se encontró el video '{video_name}'"}).encode('utf-8'))
 
         c.close()
 
 if __name__ == '__main__':
     main()
+
+
+
+
+
+
+
+
