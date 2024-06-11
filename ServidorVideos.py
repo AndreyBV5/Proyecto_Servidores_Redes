@@ -38,7 +38,7 @@ def main():
             break
         except ConnectionRefusedError:
             print("Conexión rechazada, intentando de nuevo en 5 segundos...")
-            time.sleep(5)  # Espera 5 segundos antes de intentar de nuevo
+            time.sleep(10)  # Espera 5 segundos antes de intentar de nuevo
 
     video_server_info = {
         'host': video_server_host,
@@ -60,7 +60,7 @@ def main():
             c.send(json.dumps(videos).encode('utf-8'))
         else:
             try:
-                video_name, part_number, part_size, video_size = data.split('|')
+                video_name, part_number, part_size, video_size = data.split(' | ')
                 part_number = int(part_number)
                 part_size = int(part_size)
                 video_size = int(video_size)

@@ -10,19 +10,20 @@ def main(port):
     s.bind((host, port))
     s.listen(5)
 
-    print(f"Servidor principal escuchando en {host}:{port}")
+    print(f"\nServidor principal escuchando en {host} : {port}")
+    print(f"Servidores videos deben conectarse en: {host}")
 
     video_servers = {}
 
     while True:
         c, addr = s.accept()
-        print("Conexión desde: " + str(addr))
+        print("\nConexión desde: " + str(addr))
         data = c.recv(1024).decode('utf-8')
         if not data:
             c.close()
             continue
 
-        print("Desde el usuario conectado: " + data)
+        print("\nServidor de videos conectado: " + data)
 
         if data == 'get_video_list':
             all_videos = {}
@@ -76,7 +77,7 @@ def main(port):
             try:
                 video_server_info = json.loads(data)
                 video_servers[addr] = video_server_info
-                print(f"Servidor de videos conectado: {video_server_info}")
+                #print(f"Servidor de videos conectado: {video_server_info}")
                 c.send(json.dumps({"status": "Servidor de videos registrado con éxito"}).encode('utf-8'))
             except json.JSONDecodeError as e:
                 print(f"Error al decodificar JSON: {e}")
