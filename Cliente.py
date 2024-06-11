@@ -3,6 +3,8 @@ import socket
 import json
 import argparse
 import time
+import os  # Importamos la biblioteca OS
+
 from tqdm import tqdm
 
 def receive_message(s, buffer_size=1024):
@@ -43,6 +45,7 @@ def main():
     parser.add_argument('port', type=int, help='Puerto del servidor principal')
     parser.add_argument('host', type=str, help='IP del servidor principal')
     parser.add_argument('-l', '--lista', action='store_true', help='Mostrar lista de videos disponibles en el servidor principal')
+    os.system('cls' if os.name == 'nt' else 'clear')
     parser.add_argument('-v', '--video', type=int, help='Número del video a descargar')
     args = parser.parse_args()
 
@@ -87,10 +90,11 @@ def main():
 
             # Descargar el video
             download_video(s, video_name, video_size, num_parts)
-
+            
         s.close()
     except Exception as e:
         print(f"Error al conectar al servidor principal: {e}")
 
+    
 if __name__ == '__main__':
     main()

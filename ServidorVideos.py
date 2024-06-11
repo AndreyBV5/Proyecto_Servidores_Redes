@@ -5,10 +5,31 @@ import json
 import argparse
 import time
 from threading import Thread, Event
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 def get_video_list(video_dir):
     return [{'name': video, 'size': os.path.getsize(os.path.join(video_dir, video))}
             for video in os.listdir(video_dir) if os.path.isfile(os.path.join(video_dir, video))]
+
+class VideoDirectoryHandler(FileSystemEventHandler):
+    def __init__(self, video_dir, main_server_host, main_server_port, video_server_info):
+        self.video_dir = video_dir
+        self.main_server_host = main_server_host
+        self.main_server_port = main_server_port
+        self.video_server_info = video_server_info
+
+    def update_main_server(self):
+        self.video_server_info['videos'] = get_video_list(self.video_dir)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((self.main_server_host, self.main_server_port))
+            s.send(f"update_video_list|{json.dumps(self.video_server_info)}".encode('utf-8'))
+
+    def on_created(self, event):
+        self.update_main_server()
+
+    def on_deleted(self, event):
+        self.update_main_server()
 
 def connect_to_main_server(main_server_host, main_server_port, video_server_info, stop_event):
     while not stop_event.is_set():
@@ -35,6 +56,7 @@ def check_main_server_activity(main_server_host, main_server_port, check_interva
                 if response == 'pong':
                     if not main_server_active:
                         print("El servidor principal está activo.")
+                        print("")
                     main_server_active = True
                     attempts = 0
                 else:
@@ -64,8 +86,18 @@ def main():
 
     video_server_host = '192.168.0.9'  # IP del Servidor de Videos
 
-    print(f"Servidor de videos iniciado en {video_server_host}:{port}")
+    print(f"\nServidor de videos iniciado en {video_server_host}:{port}")
     print(f"Almacenando videos desde {video_dir}")
+
+    # Observador para manejar cambios en el directorio de videos
+    observer = Observer()
+    event_handler = VideoDirectoryHandler(video_dir, main_server_host, 5000, {
+        'host': video_server_host,
+        'port': port,
+        'videos': get_video_list(video_dir)
+    })
+    observer.schedule(event_handler, video_dir, recursive=True)
+    observer.start()
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind((video_server_host, port))
@@ -129,6 +161,10 @@ def main():
 
     print("Servidor de videos cerrado debido a la caída del servidor principal.")
     s.close()
+    observer.stop()
+    observer.join()
 
 if __name__ == '__main__':
     main()
+
+

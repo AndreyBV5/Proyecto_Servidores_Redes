@@ -10,7 +10,7 @@ def main(port):
     s.bind((host, port))
     s.listen(5)
 
-    print(f"Servidor principal escuchando en {host}:{port}")
+    print(f"\nServidor principal escuchando en {host}:{port}")
 
     video_servers = {}
     seen_connections = set()
@@ -19,7 +19,7 @@ def main(port):
     while True:
         c, addr = s.accept()
         if addr not in seen_connections:
-            print("Conexión desde: " + str(addr))
+            print("\nConexión desde: " + str(addr))
             seen_connections.add(addr)
         
         data = c.recv(1024).decode('utf-8')
@@ -81,11 +81,21 @@ def main(port):
                 c.send(json.dumps({"error": "Número de video inválido"}).encode('utf-8'))
         elif data == 'ping':
             c.send('pong'.encode('utf-8'))
+        elif data.startswith('update_video_list'):
+            try:
+                command, video_server_info_str = data.split('|', 1)
+                video_server_info = json.loads(video_server_info_str)
+                video_servers[(video_server_info['host'], video_server_info['port'])] = video_server_info
+                print(f"Lista de videos actualizada desde {video_server_info['host']}:{video_server_info['port']}")
+                c.send(json.dumps({"status": "Lista de videos actualizada con éxito"}).encode('utf-8'))
+            except ValueError as e:
+                print(f"Error al decodificar JSON: {e}")
+                c.send(json.dumps({"error": "Error al decodificar JSON"}).encode('utf-8'))
         else:
             # Manejo de conexión desde el Servidor de Videos
             try:
                 video_server_info = json.loads(data)
-                video_servers[addr] = video_server_info
+                video_servers[(addr[0], video_server_info['port'])] = video_server_info
                 print(f"Servidor de videos conectado: {video_server_info}")
                 c.send(json.dumps({"status": "Servidor de videos registrado con éxito"}).encode('utf-8'))
             except json.JSONDecodeError as e:
@@ -98,3 +108,6 @@ if __name__ == '__main__':
     parser.add_argument("port", type=int, help="Puerto en el que escucha el servidor")
     args = parser.parse_args()
     main(args.port)
+
+
+
