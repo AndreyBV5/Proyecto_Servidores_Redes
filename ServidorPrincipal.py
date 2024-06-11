@@ -4,26 +4,33 @@ import json
 import argparse
 
 def main(port):
-    host = '192.168.0.9'  
+    host = '192.168.0.9'
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind((host, port))
     s.listen(5)
 
-    print(f"\nServidor principal escuchando en {host} : {port}")
-    print(f"Servidores videos deben conectarse en: {host}")
+    print(f"Servidor principal escuchando en {host}:{port}")
 
     video_servers = {}
+    seen_connections = set()
+    seen_pings = set()
 
     while True:
         c, addr = s.accept()
-        print("\nConexión desde: " + str(addr))
+        if addr not in seen_connections:
+            print("Conexión desde: " + str(addr))
+            seen_connections.add(addr)
+        
         data = c.recv(1024).decode('utf-8')
         if not data:
             c.close()
             continue
 
-        print("\nServidor de videos conectado: " + data)
+        if data == 'ping':
+            if addr not in seen_pings:
+                print("Desde el usuario conectado: " + data)
+                seen_pings.add(addr)
 
         if data == 'get_video_list':
             all_videos = {}
@@ -72,12 +79,14 @@ def main(port):
                     vs_socket.close()
             else:
                 c.send(json.dumps({"error": "Número de video inválido"}).encode('utf-8'))
+        elif data == 'ping':
+            c.send('pong'.encode('utf-8'))
         else:
             # Manejo de conexión desde el Servidor de Videos
             try:
                 video_server_info = json.loads(data)
                 video_servers[addr] = video_server_info
-                #print(f"Servidor de videos conectado: {video_server_info}")
+                print(f"Servidor de videos conectado: {video_server_info}")
                 c.send(json.dumps({"status": "Servidor de videos registrado con éxito"}).encode('utf-8'))
             except json.JSONDecodeError as e:
                 print(f"Error al decodificar JSON: {e}")

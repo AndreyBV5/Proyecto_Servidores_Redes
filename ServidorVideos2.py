@@ -4,10 +4,52 @@ import socket
 import json
 import argparse
 import time
+from threading import Thread, Event
 
 def get_video_list(video_dir):
     return [{'name': video, 'size': os.path.getsize(os.path.join(video_dir, video))}
             for video in os.listdir(video_dir) if os.path.isfile(os.path.join(video_dir, video))]
+
+def connect_to_main_server(main_server_host, main_server_port, video_server_info, stop_event):
+    while not stop_event.is_set():
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as main_server_socket:
+                main_server_socket.connect((main_server_host, main_server_port))
+                main_server_socket.send(json.dumps(video_server_info).encode('utf-8'))
+                print("Servidor principal conectado y registrado con éxito.")
+                return
+        except ConnectionRefusedError:
+            print("Conexión rechazada, intentando de nuevo en 5 segundos...")
+            stop_event.wait(2)
+    print("Detenido intento de conexión al servidor principal.")
+
+def check_main_server_activity(main_server_host, main_server_port, check_interval, timeout, stop_event):
+    attempts = 0
+    main_server_active = False
+    while not stop_event.is_set():
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as main_server_socket:
+                main_server_socket.connect((main_server_host, main_server_port))
+                main_server_socket.send(b'ping')
+                response = main_server_socket.recv(1024).decode('utf-8')
+                if response == 'pong':
+                    if not main_server_active:
+                        print("El servidor principal está activo.")
+                    main_server_active = True
+                    attempts = 0
+                else:
+                    raise ConnectionError("Respuesta inesperada del servidor principal.")
+        except Exception as e:
+            attempts += 1
+            print(f"Intento {attempts}/3 fallido: {e}")
+            if attempts >= 3:
+                print("El servidor principal se considera caído. Cerrando el servidor de videos.")
+                stop_event.set()
+                break
+        stop_event.wait(check_interval)
+    if not main_server_active:
+        print("El servidor principal no está activo. Cerrando el servidor de videos.")
+        stop_event.set()
 
 def main():
     parser = argparse.ArgumentParser(description='Servidor de Videos')
@@ -29,26 +71,23 @@ def main():
     s.bind((video_server_host, port))
     s.listen(5)
 
-    # Conectar al Servidor Principal y enviar la lista de videos
-    main_server_port = 5000  # Puerto del Servidor Principal
-    main_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    while True:
-        try:
-            main_server_socket.connect((main_server_host, main_server_port))
-            break
-        except ConnectionRefusedError:
-            print("Conexión rechazada, intentando de nuevo en 5 segundos...")
-            time.sleep(5)  # Espera 5 segundos antes de intentar de nuevo
-
     video_server_info = {
         'host': video_server_host,
         'port': port,
         'videos': get_video_list(video_dir)
     }
-    main_server_socket.send(json.dumps(video_server_info).encode('utf-8'))
-    main_server_socket.close()
 
-    while True:
+    stop_event = Event()
+
+    # Hilo para conectar al servidor principal y registrar el servidor de videos
+    connection_thread = Thread(target=connect_to_main_server, args=(main_server_host, 5000, video_server_info, stop_event))
+    connection_thread.start()
+
+    # Hilo para verificar la actividad del servidor principal
+    check_thread = Thread(target=check_main_server_activity, args=(main_server_host, 5000, 10, 30, stop_event))
+    check_thread.start()
+
+    while not stop_event.is_set():
         c, addr = s.accept()
         print(f"Conexión desde: {addr}")
 
@@ -87,6 +126,9 @@ def main():
                 c.send(json.dumps({"error": "Error al procesar la solicitud"}).encode('utf-8'))
 
         c.close()
+
+    print("Servidor de videos cerrado debido a la caída del servidor principal.")
+    s.close()
 
 if __name__ == '__main__':
     main()
