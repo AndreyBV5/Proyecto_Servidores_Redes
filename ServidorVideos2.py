@@ -7,10 +7,53 @@ import time
 from threading import Thread, Event
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from rich.console import Console
+from rich.table import Table
+
+console = Console()
 
 def get_video_list(video_dir):
     return [{'name': video, 'size': os.path.getsize(os.path.join(video_dir, video))}
             for video in os.listdir(video_dir) if os.path.isfile(os.path.join(video_dir, video))]
+
+def display_video_list(videos):
+    table = Table(title="Lista de Videos")
+
+    table.add_column("Nombre", style="cyan", no_wrap=True)
+    table.add_column("Tamaño (bytes)", style="magenta")
+
+    for video in videos:
+        table.add_row(video['name'], str(video['size']))
+
+    console.print(table)
+
+def display_server_info(video_server_host, port, video_dir, main_server_status):
+    console.print(f"Servidor de video iniciado en {video_server_host}:{port}", style="bold yellow")
+    
+    table = Table(title="Información del Servidor de Videos")
+
+    table.add_column("Parámetro", style="bold cyan", no_wrap=True)
+    table.add_column("Valor", style="bold magenta")
+
+    table.add_row("Host del Servidor de Videos", video_server_host)
+    table.add_row("Puerto del Servidor de Videos", str(port))
+    table.add_row("Directorio de Videos", video_dir)
+    table.add_row("Estado del Servidor Principal", main_server_status)
+
+    console.print(table)
+
+def display_download_info(video_name, part_size, part_number, duration, video_size):
+    table = Table(title="Descarga de Video")
+
+    table.add_column("Nombre", style="bold cyan", no_wrap=True)
+    table.add_column("Tamaño de la Parte (bytes)", style="bold magenta")
+    table.add_column("Parte", style="bold green")
+    table.add_column("Tiempo de Descarga (s)", style="bold yellow")
+
+    part_info = "video completo" if part_size == video_size else str(part_number)
+    table.add_row(video_name, str(part_size), part_info, f"{duration:.2f}")
+
+    console.print(table)
 
 class VideoDirectoryHandler(FileSystemEventHandler):
     def __init__(self, video_dir, main_server_host, main_server_port, video_server_info):
@@ -37,12 +80,10 @@ def connect_to_main_server(main_server_host, main_server_port, video_server_info
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as main_server_socket:
                 main_server_socket.connect((main_server_host, main_server_port))
                 main_server_socket.send(json.dumps(video_server_info).encode('utf-8'))
-                print("Servidor principal conectado y registrado con éxito.")
-                return
+                return "Conectado y registrado con éxito"
         except ConnectionRefusedError:
-            print("Conexión rechazada, intentando de nuevo en 5 segundos...")
             stop_event.wait(2)
-    print("Detenido intento de conexión al servidor principal.")
+    return "Conexión rechazada, intentos agotados"
 
 def check_main_server_activity(main_server_host, main_server_port, check_interval, timeout, stop_event):
     attempts = 0
@@ -55,22 +96,19 @@ def check_main_server_activity(main_server_host, main_server_port, check_interva
                 response = main_server_socket.recv(1024).decode('utf-8')
                 if response == 'pong':
                     if not main_server_active:
-                        print("El servidor principal está activo.")
-                    main_server_active = True
-                    attempts = 0
+                        main_server_active = True
+                        return "Activo"
                 else:
                     raise ConnectionError("Respuesta inesperada del servidor principal.")
         except Exception as e:
             attempts += 1
-            print(f"Intento {attempts}/3 fallido: {e}")
             if attempts >= 3:
-                print("El servidor principal se considera caído. Cerrando el servidor de videos.")
                 stop_event.set()
-                break
+                return "Caído"
         stop_event.wait(check_interval)
     if not main_server_active:
-        print("El servidor principal no está activo. Cerrando el servidor de videos.")
         stop_event.set()
+        return "Caído"
 
 def main():
     parser = argparse.ArgumentParser(description='Servidor de Videos')
@@ -83,24 +121,7 @@ def main():
     main_server_host = args.host
     video_dir = args.video_dir
 
-    video_server_host = 'localhost'  # IP del Servidor de Videos
-
-    print(f"Servidor de videos iniciado en {video_server_host}:{port}")
-    print(f"Almacenando videos desde {video_dir}")
-
-    # Observador para manejar cambios en el directorio de videos
-    observer = Observer()
-    event_handler = VideoDirectoryHandler(video_dir, main_server_host, 5000, {
-        'host': video_server_host,
-        'port': port,
-        'videos': get_video_list(video_dir)
-    })
-    observer.schedule(event_handler, video_dir, recursive=True)
-    observer.start()
-
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind((video_server_host, port))
-    s.listen(5)
+    video_server_host = '192.168.0.9'  # IP del Servidor de Videos
 
     video_server_info = {
         'host': video_server_host,
@@ -110,23 +131,28 @@ def main():
 
     stop_event = Event()
 
-    # Hilo para conectar al servidor principal y registrar el servidor de videos
-    connection_thread = Thread(target=connect_to_main_server, args=(main_server_host, 5000, video_server_info, stop_event))
-    connection_thread.start()
+    connection_status = connect_to_main_server(main_server_host, 5000, video_server_info, stop_event)
+    main_server_status = check_main_server_activity(main_server_host, 5000, 10, 30, stop_event)
 
-    # Hilo para verificar la actividad del servidor principal
-    check_thread = Thread(target=check_main_server_activity, args=(main_server_host, 5000, 10, 30, stop_event))
-    check_thread.start()
+    display_server_info(video_server_host, port, video_dir, main_server_status)
+
+    observer = Observer()
+    event_handler = VideoDirectoryHandler(video_dir, main_server_host, 5000, video_server_info)
+    observer.schedule(event_handler, video_dir, recursive=True)
+    observer.start()
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind((video_server_host, port))
+    s.listen(5)
 
     while not stop_event.is_set():
         c, addr = s.accept()
-        print(f"Conexión desde: {addr}")
 
         data = c.recv(1024).decode('utf-8')
-        print(f"Desde el usuario conectado: {data}")
 
         if data == 'get_video_list':
             videos = get_video_list(video_dir)
+            display_video_list(videos)
             c.send(json.dumps(videos).encode('utf-8'))
         else:
             try:
@@ -149,16 +175,14 @@ def main():
                         bytes_remaining -= len(chunk)
                 end_time = time.time()
                 duration = end_time - start_time
-                print(f"Parte {part_number} descargada en {duration:.2f} segundos")
+                display_download_info(video_name, part_size - bytes_remaining, part_number, duration, video_size)
             except FileNotFoundError:
                 c.send(json.dumps({"error": f"No se encontró el video '{video_name}'"}).encode('utf-8'))
             except Exception as e:
-                print(f"Error al procesar la solicitud: {e}")
                 c.send(json.dumps({"error": "Error al procesar la solicitud"}).encode('utf-8'))
 
         c.close()
 
-    print("Servidor de videos cerrado debido a la caída del servidor principal.")
     s.close()
     observer.stop()
     observer.join()

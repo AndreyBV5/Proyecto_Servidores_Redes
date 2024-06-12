@@ -2,10 +2,14 @@
 import socket
 import json
 import argparse
-import time
-import os  # Importamos la biblioteca OS
+import os
+from threading import Thread, Lock
+from rich.console import Console
+from rich.table import Table
+from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn, TransferSpeedColumn
+from time import time
 
-from tqdm import tqdm
+console = Console()
 
 def receive_message(s, buffer_size=1024):
     data = b''
@@ -16,29 +20,72 @@ def receive_message(s, buffer_size=1024):
             break
     return data.decode('utf-8')
 
-def download_video(s, video_name, video_size, num_parts):
-    with open(video_name, 'wb') as f:
-        downloaded = 0
-        start_time = time.time()
-        
-        with tqdm(total=video_size, unit='B', unit_scale=True, desc=video_name, ascii=True) as pbar:
-            for part in range(num_parts):
-                part_start_time = time.time()
-                while downloaded < (part + 1) * (video_size // num_parts):
-                    chunk = s.recv(1024)
-                    if not chunk:
-                        break
-                    f.write(chunk)
-                    downloaded += len(chunk)
-                    pbar.update(len(chunk))
-                part_end_time = time.time()
-                part_duration = part_end_time - part_start_time
-                print(f"Parte {part} descargada en {part_duration:.2f} segundos")
-        
-        end_time = time.time()
-        total_duration = end_time - start_time
-        print(f"Video descargado como {video_name}")
-        print(f"Tiempo total de descarga: {total_duration:.2f} segundos")
+def download_part(server_info, video_name, part_number, part_size, video_size, progress, task_id, lock, total_parts):
+    video_host, video_port = server_info
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as vs_socket:
+        vs_socket.connect((video_host, video_port))
+        vs_socket.send(f"{video_name}|{part_number}|{part_size}|{video_size}".encode('utf-8'))
+        part_filename = f"{video_name}.part{part_number}" if total_parts > 1 else video_name
+        with open(part_filename, 'wb') as f:
+            downloaded = 0
+            start_time = time()
+            while True:
+                chunk = vs_socket.recv(1024)
+                if not chunk:
+                    break
+                f.write(chunk)
+                downloaded += len(chunk)
+                with lock:
+                    progress.update(task_id, advance=len(chunk))
+            end_time = time()
+    download_time = end_time - start_time
+    if total_parts > 1:
+        console.print(f"Parte {part_number} descargada. Tamaño: {downloaded} bytes. Tiempo: {download_time:.2f} segundos.")
+    else:
+        console.print(f"Video descargado. Tamaño: {downloaded} bytes. Tiempo: {download_time:.2f} segundos.")
+
+def download_video(s, video_name, video_size, parts_info):
+    progress = Progress(
+        TextColumn("[bold blue]{task.fields[filename]}", justify="right"),
+        BarColumn(),
+        "[progress.percentage]{task.percentage:>3.1f}%",
+        "•",
+        TransferSpeedColumn(),
+        "•",
+        TimeRemainingColumn(),
+        console=console,
+    )
+
+    with progress:
+        tasks = []
+        total_parts = len(parts_info)
+        for part_number, (server_info, part_size) in enumerate(parts_info):
+            task_id = progress.add_task(
+                f"[green]Descargando parte {part_number}..." if total_parts > 1 else "[green]Descargando video...",
+                filename=f"{video_name} (parte {part_number})" if total_parts > 1 else video_name,
+                total=part_size
+            )
+            tasks.append(task_id)
+
+        lock = Lock()
+        threads = []
+        for part_number, (server_info, part_size) in enumerate(parts_info):
+            thread = Thread(target=download_part, args=(server_info, video_name, part_number, part_size, video_size, progress, tasks[part_number], lock, total_parts))
+            threads.append(thread)
+            thread.start()
+
+        for thread in threads:
+            thread.join()
+
+    if total_parts > 1:
+        with open(video_name, 'wb') as final_file:
+            for part_number in range(len(parts_info)):
+                part_filename = f"{video_name}.part{part_number}"
+                with open(part_filename, 'rb') as part_file:
+                    final_file.write(part_file.read())
+                os.remove(part_filename)
+
+    console.print(f"Video descargado como [bold green]{video_name}[/bold green]")
 
 def main():
     parser = argparse.ArgumentParser(description="Cliente para acceder al servidor principal.")
@@ -54,8 +101,8 @@ def main():
     show_video_list = args.lista
     video_number = args.video
 
-    print(f"Conectando al servidor principal en {host}:{port}")
-
+    console.print(f"Conectando al servidor principal en [bold yellow]{host}:{port}[/bold yellow]")
+    console.print("")
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect((host, port))
@@ -68,10 +115,16 @@ def main():
             data = receive_message(s)
             video_list = json.loads(data)
 
-            # Mostrar la lista de videos
-            print("Lista de videos disponibles:")
+            # Mostrar la lista de videos usando rich
+            table = Table(title="Lista de Videos Disponibles")
+            table.add_column("Número", justify="right", style="cyan", no_wrap=True)
+            table.add_column("Nombre", style="magenta")
+            table.add_column("Tamaño (bytes)", justify="right", style="green")
+
             for idx, video in enumerate(video_list, start=1):
-                print(f"{idx}. {video['name']} - {video['size']} bytes")
+                table.add_row(str(idx), video['name'], str(video['size']))
+
+            console.print(table)
 
         if video_number:
             # Solicitar la descarga del video
@@ -81,20 +134,19 @@ def main():
             video_data = receive_message(s)
             video_info = json.loads(video_data)
             if "error" in video_info:
-                print(video_info["error"])
+                console.print(f"[bold red]Error:[/bold red] {video_info['error']}")
                 return
 
             video_name = video_info["video_name"]
             video_size = video_info["video_size"]
-            num_parts = video_info["parts"]
+            parts_info = video_info["parts_info"]
 
             # Descargar el video
-            download_video(s, video_name, video_size, num_parts)
+            download_video(s, video_name, video_size, parts_info)
             
         s.close()
     except Exception as e:
-        print(f"Error al conectar al servidor principal: {e}")
+        console.print(f"[bold red]Error al conectar al servidor principal:[/bold red] {e}")
 
-    
 if __name__ == '__main__':
     main()
