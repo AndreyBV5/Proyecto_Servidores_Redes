@@ -21,7 +21,7 @@ def display_server_info(video_servers):
     console.print(table)
 
 def main(port):
-    host = '192.168.0.9'
+    host = '172.17.47.138'
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind((host, port))
     s.listen(5)

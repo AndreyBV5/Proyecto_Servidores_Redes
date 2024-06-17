@@ -121,7 +121,7 @@ def main():
     main_server_host = args.host
     video_dir = args.video_dir
 
-    video_server_host = '192.168.0.9'  # IP del Servidor de Videos
+    video_server_host = '172.17.47.138'  # IP del Servidor de Videos
 
     video_server_info = {
         'host': video_server_host,
